@@ -167,7 +167,7 @@ ActionRef hidden():
 // fully qualified references e.g. event a() = monitor trigger b(), b() needs to be referenced as a.b() but monitorTrigger=[MonitorTrigger]
 // does not currently allow it.
 MonitorTriggerFire:
-	'#generate' 'trigger' monitorTrigger=[MonitorTrigger] '(' monitorTriggerActualParameters=ActualParameters ')';
+	'##generate' 'trigger' monitorTrigger=[MonitorTrigger] '(' monitorTriggerActualParameters=ActualParameters ')';
 
 Rules:
 	(rules+=Rule)*;

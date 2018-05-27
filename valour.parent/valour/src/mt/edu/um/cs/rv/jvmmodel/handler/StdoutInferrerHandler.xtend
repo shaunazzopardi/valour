@@ -28,6 +28,7 @@ import org.eclipse.xtext.nodemodel.util.NodeModelUtils
 import org.eclipse.xtext.xbase.XExpression
 import org.eclipse.xtext.xbase.jvmmodel.IJvmDeclaredTypeAcceptor
 import org.eclipse.xtext.xtype.XImportSection
+import mt.edu.um.cs.rv.valour.MainPackageDeclaration
 
 public class StdoutInferrerHandler extends InferrerHandler {
 
@@ -42,6 +43,19 @@ public class StdoutInferrerHandler extends InferrerHandler {
 			}
 		}
 	}
+	
+	override handleMainPackageDeclaration(MainPackageDeclaration mainPackageDeclaration) {
+		if(mainPackageDeclaration.package != null){
+			print('main package: ')
+			for(i : 0 .. mainPackageDeclaration.package.size() - 2){
+				print(mainPackageDeclaration.package.get(i) + ', ')
+			}
+			
+			print(mainPackageDeclaration.package.get(mainPackageDeclaration.package.size() - 1))
+			println('')			
+		}
+	}
+	
 
 	override handleDeclarationsBlockStart() {
 		println("declarations {")
@@ -66,7 +80,8 @@ public class StdoutInferrerHandler extends InferrerHandler {
 			println()
 			print('\t|| ')
 		}
-		println('system controlflow trigger \"' + controlFlowTrigger.aop.expression + '\"')
+		//TODO update
+	//	println('system controlflow trigger \"' + controlFlowTrigger.aop + '\"')
 	}
 
 	override handleMonitorTrigger(MonitorTrigger monitorTrigger, Boolean additionalTrigger) {

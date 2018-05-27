@@ -25,6 +25,7 @@ import org.eclipse.xtext.xbase.jvmmodel.IJvmDeclaredTypeAcceptor
 import org.eclipse.xtext.xbase.jvmmodel.JvmAnnotationReferenceBuilder
 import org.eclipse.xtext.xbase.jvmmodel.JvmTypeReferenceBuilder
 import org.eclipse.xtext.xtype.XImportSection
+import mt.edu.um.cs.rv.valour.MainPackageDeclaration
 
 public abstract class InferrerHandler {	
 	
@@ -33,6 +34,8 @@ public abstract class InferrerHandler {
 	def void initialise(Model model, IJvmDeclaredTypeAcceptor acceptor)
 	
 	def void handleImports(XImportSection imports);
+	
+	def void handleMainPackageDeclaration(MainPackageDeclaration mainPackageDeclaration);
 	
 	def void handleDeclarationsBlockStart();
 	

@@ -1,5 +1,6 @@
 package mt.edu.um.cs.rv.jvmmodel.handler;
 
+ 
 import com.google.common.collect.ArrayListMultimap
 import com.google.common.collect.Multimap
 import java.util.ArrayList
@@ -45,6 +46,10 @@ import org.eclipse.xtext.xbase.jvmmodel.JvmTypeReferenceBuilder
 import org.eclipse.xtext.xbase.jvmmodel.JvmTypesBuilder
 import org.eclipse.xtext.xbase.lib.Procedures.Procedure1
 import org.eclipse.xtext.xtype.XImportSection
+import mt.edu.um.cs.rv.valour.AspectJParameter
+import mt.edu.um.cs.rv.valour.FormalParameter
+import mt.edu.um.cs.rv.valour.impl.FormalParameterImpl
+import mt.edu.um.cs.rv.valour.MainPackageDeclaration
 
 public class JavaInferrerHandler extends InferrerHandler {
 
@@ -69,6 +74,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 	var conditionCounter = 1;
 	var stateCounter = 1;
 	var monitorTriggers = 1;
+	var controlFlowTriggers = 1;
 
 	@Extension JvmAnnotationReferenceBuilder _annotationTypesBuilder;
 	@Extension JvmTypeReferenceBuilder _typeReferenceBuilder;
@@ -101,6 +107,10 @@ public class JavaInferrerHandler extends InferrerHandler {
 					"org.springframework.context.annotation.Import",
 					Pair.of("value", typeRef("mt.edu.um.cs.rv.eventmanager.engine.config.EventManagerConfigration"))
 				)
+				annotations += model.toAnnotationRefWithStringPair(
+					"org.springframework.context.annotation.ComponentScan",
+					Pair.of("value", String.join(', ', model.mainPackage.package))
+				)
 				members += model.toMethod(
 					"main",
 					typeRef(void),
@@ -109,7 +119,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 						visibility = JvmVisibility.PUBLIC
 						parameters += model.toParameter("args", typeRef(String).addArrayTypeDimension)
 						body = '''
-							org.springframework.boot.SpringApplication.run(Â«monitoringSystemClassNameÂ».class, args);
+							org.springframework.boot.SpringApplication.run(«monitoringSystemClassName».class, args);
 						'''
 					]
 				)
@@ -136,6 +146,10 @@ public class JavaInferrerHandler extends InferrerHandler {
 
 	override handleImports(XImportSection imports) {
 		// nothing to do here, this will be implemented automatically by Xtext
+	}
+	
+	override handleMainPackageDeclaration(MainPackageDeclaration mainPackageDeclaration){
+		// nothing to do here
 	}
 
 	override handleDeclarationsBlockStart() {
@@ -169,7 +183,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 		])
 		
 
-		if (event.eventFormalParameters != null && !event.eventFormalParameters.parameters.isNullOrEmpty) {
+		if (event.eventFormalParameters !== null && !event.eventFormalParameters.parameters.isNullOrEmpty) {
 
 			// generate a private field for each event parameter
 			event.eventFormalParameters.parameters.forEach [ param |
@@ -187,9 +201,9 @@ public class JavaInferrerHandler extends InferrerHandler {
 			// add constructor with all properties for event
 			val constuctor = event.toConstructor [
 				body = '''
-					Â«FOR param : event.eventFormalParameters.parametersÂ»
-						this.Â«param.nameÂ» = Â«param.nameÂ»;
-						Â«ENDFORÂ» 
+					«FOR param : event.eventFormalParameters.parameters»
+						this.«param.name» = «param.name»;
+						«ENDFOR» 
 				'''
 			]
 			eventClass.members += constuctor
@@ -219,10 +233,10 @@ public class JavaInferrerHandler extends InferrerHandler {
 			typeRef(eventClass),
 			[
 				body = '''
-				Â«eventClass.qualifiedNameÂ» event = new Â«eventClass.qualifiedNameÂ»(
-					Â«IF (!event.eventFormalParameters.parameters.isNullOrEmpty)Â»
-						Â«event.eventFormalParameters.parameters.stream.map[p | "this."+p.name].collect(Collectors.joining(", "))Â» 
-					Â«ENDIFÂ»
+				«eventClass.qualifiedName» event = new «eventClass.qualifiedName»(
+					«IF (!event.eventFormalParameters.parameters.isNullOrEmpty)»
+						«event.eventFormalParameters.parameters.stream.map[p | "this."+p.name].collect(Collectors.joining(", "))» 
+					«ENDIF»
 				);
 				return event;
 				'''
@@ -234,7 +248,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 			[
 				parameters += event.toParameter("synchronous", typeRef(boolean))
 				body = '''
-				Â«eventClass.qualifiedNameÂ» event = this.build();
+				«eventClass.qualifiedName» event = this.build();
 				event.setSynchronous(synchronous);
 				return event;
 				'''
@@ -257,7 +271,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 			[
 				static = false
 				visibility = JvmVisibility.PUBLIC
-				annotations += annotationRef(Override)
+				//annotations += annotationRef("java.lang.annotation.Override")
 				body = '''return synchronous;'''
 			]
 		)
@@ -270,12 +284,12 @@ public class JavaInferrerHandler extends InferrerHandler {
 			[
 				static = false
 				visibility = JvmVisibility.PUBLIC
-				annotations += annotationRef(Override)
-				body = '''return "Â«eventDecNameÂ»";'''
+				//annotations += annotationRef("java.lang.annotation.Override")
+				body = '''return "«eventDecName»";'''
 			]
 		)
 
-		if (event.eventBody.categorisation != null) {
+		if (event.eventBody.categorisation !== null) {
 
 			val keyType = event.eventBody.categorisation.category.category.keyType
 			eventClass.superTypes += typeRef("mt.edu.um.cs.rv.events.CategorisedEvent", keyType)
@@ -286,12 +300,12 @@ public class JavaInferrerHandler extends InferrerHandler {
 				[
 					static = false
 					visibility = JvmVisibility.PUBLIC
-					annotations += annotationRef(Override)
+					//annotations += annotationRef("java.lang.annotation.Override")
 
 //					event.eventFormalParameters.parameters.forEach [ param |
 //						parameters += param.toParameter(param.name, param.parameterType)
 //					]
-					if (event.eventBody.categorisation.categoryExpression.simple != null) {
+					if (event.eventBody.categorisation.categoryExpression.simple !== null) {
 						body = event.eventBody.categorisation.categoryExpression.simple
 					} else {
 						body = event.eventBody.categorisation.categoryExpression.complex
@@ -313,8 +327,352 @@ public class JavaInferrerHandler extends InferrerHandler {
 	override handleEventDeclarationEnd(Event event) {
 		// nothing to do here
 	}
+	
+	def String AspectJParameterToString(AspectJParameter par){
+		if(par.ignoreOne !== null){
+			return "*"
+		}
+		else if(par.ignoreAsNeeded !== null){
+			return "**"
+		}
+		else{
+			val paramType = par.full.parameterType
+			return " " + paramType.getQualifiedName() + " " + par.full.name
+		}
+	}
+	
+	def String AspectJParameterTypeToString(AspectJParameter par){
+		if(par.ignoreOne !== null){
+			return "*"
+		}
+		else if(par.ignoreAsNeeded !== null){
+			return "**"
+		}
+		else{
+			val paramType = par.full.parameterType
+			return paramType.getQualifiedName()
+		}
+	}
+	
+	def String AspectJParameterNameToString(AspectJParameter par){
+		if(par.ignoreOne !== null){
+			return "*"
+		}
+		else if(par.ignoreAsNeeded !== null){
+			return "**"
+		}
+		else{
+			val paramType = par.full.parameterType
+			return par.full.name
+		}
+	}
+	
+	def String methodIDOfControlFlowTrigger(ControlFlowTrigger controlFlowTrigger){
+		if(controlFlowTrigger.methodID == null){
+			 return "*"
+		}
+		else{
+			return controlFlowTrigger.methodID;
+		}
+	}
+	
+	def String parametersOfControlFlowTrigger(ControlFlowTrigger controlFlowTrigger){
+		val args = controlFlowTrigger.params.getArgs()
+		val String[] parameters = newArrayOfSize(args.size())
+		
+		for(i : 0 .. parameters.size() - 1){
+			parameters.set(i, AspectJParameterToString(args.get(i)).replace("**", ".."))
+		}
+		
+		if(controlFlowTrigger.execPoint !== null){
+	
+			if(controlFlowTrigger.execPoint.uponThrow !== null
+				&& controlFlowTrigger.execPoint.uponThrow.exception !== null){
+				String.join(", ", parameters) + ", Exception " + controlFlowTrigger.execPoint.uponThrow.exception 
+			}
+			else if(controlFlowTrigger.execPoint.exit !== null
+				&& controlFlowTrigger.execPoint.exit.ret !== null){
+					String.join(", ", parameters) + ", " + controlFlowTrigger.execPoint.exit.ret.parameterType + " " + controlFlowTrigger.execPoint.exit.ret.name
+			}
+		}
+		else{
+			String.join(", ", parameters)
+		}
+	}
+	
+	def String parametersNamesOfControlFlowTrigger(ControlFlowTrigger controlFlowTrigger){
+		val args = controlFlowTrigger.params.getArgs()
+		val String[] parameters = newArrayOfSize(args.size())
+		
+		for(i : 0 .. parameters.size() - 1){
+			val name = AspectJParameterNameToString(args.get(i)).replace("**", "")
+			if(name != "")
+				parameters.set(i, name)
+		}
+		
+		String.join(", ", parameters)
+	}
+	
+	def String parametersTypesOfControlFlowTrigger(ControlFlowTrigger controlFlowTrigger){
+		val args = controlFlowTrigger.params.getArgs()
+		val String[] parameters = newArrayOfSize(args.size())
+		
+		for(i : 0 .. parameters.size() - 1){
+			parameters.set(i, AspectJParameterTypeToString(args.get(i)).replace("**", ".."))
+		}
+		
+		String.join(", ", parameters)
+	}
+	
+	
+	def String[] controlFlowParams(ControlFlowTrigger controlFlowTrigger){
+		val args = controlFlowTrigger.params.getArgs()
+		
+		var parameters = new ArrayList();
+		
+		if(controlFlowTrigger.classType !== null
+			&& controlFlowTrigger.classType.full !== null){
+				parameters.add(controlFlowTrigger.classType.full.name)
+		}
+		
+		for(i : 0 .. args.size() - 1){
+			if(args.get(i).full !== null){
+				parameters.add(args.get(i).full.name)
+			}
+		}
+		
+		if(controlFlowTrigger.execPoint !== null){
+			if(controlFlowTrigger.execPoint.uponThrow !== null
+				&& controlFlowTrigger.execPoint.uponThrow.exception !== null){
+					parameters.add(controlFlowTrigger.execPoint.uponThrow.exception)
+			}
+			else if(controlFlowTrigger.execPoint.exit !== null
+				&& controlFlowTrigger.execPoint.exit.ret !== null){
+					parameters.add(controlFlowTrigger.execPoint.exit.ret.name)
+			}
+		}
+		
+		parameters
+	}
+
+	
+	def beforeOrAfter(ControlFlowTrigger controlFlowTrigger){
+		val targetClassType = AspectJParameterTypeToString(controlFlowTrigger.classType).replace("**", "*")
+		val targetClassName = AspectJParameterNameToString(controlFlowTrigger.classType).replace("**", "")
+		val paramsTypes = parametersTypesOfControlFlowTrigger(controlFlowTrigger)
+		val paramsNames = parametersNamesOfControlFlowTrigger(controlFlowTrigger)
+		
+		var String matchingType;
+		
+		if(controlFlowTrigger.matchingType.exec === null){
+			matchingType = 'call'
+		}
+		else if(controlFlowTrigger.matchingType.call === null){
+			matchingType = 'execution'
+		}
+
+		var String aopExpression = matchingType + "(* "  
+									+ targetClassType 
+									+ "." + methodIDOfControlFlowTrigger(controlFlowTrigger)
+									+ "(" + paramsTypes + "))"
+									+ " && args(" + paramsNames + ")";
+											
+		if(controlFlowTrigger.execPoint == null
+			|| controlFlowTrigger.execPoint.entry !== null){
+					controlFlowTrigger.toAnnotationRefWithStringPair("org.aspectj.lang.annotation.Before",
+					Pair.of("pointcut", aopExpression))
+		} else if(controlFlowTrigger.execPoint.uponThrow !== null){
+					controlFlowTrigger.toAnnotationRefWithStringPair("org.aspectj.lang.annotation.AfterThrowing",
+					Pair.of("pointcut", aopExpression), Pair.of("throwing", controlFlowTrigger.execPoint.uponThrow.exception))
+		} else{
+			if(controlFlowTrigger.execPoint.exit.ret === null){
+				controlFlowTrigger.toAnnotationRefWithStringPair("org.aspectj.lang.annotation.After",
+					Pair.of("pointcut", aopExpression))
+			} else{
+				controlFlowTrigger.toAnnotationRefWithStringPair("org.aspectj.lang.annotation.AfterReturning",
+					Pair.of("pointcut", aopExpression), Pair.of("returning", controlFlowTrigger.execPoint.exit.ret.name))
+			}
+			
+		}
+	}
+	
 
 	override handleControlFlowTrigger(ControlFlowTrigger controlFlowTrigger, Boolean additionalTrigger) {
+		val packageName = packageNameToUse(controlFlowTrigger) + ".control_flow_triggers"
+		val controlFlowTriggerId = controlFlowTriggers++
+		val String className = packageName + ".ControlFlowTrigger" + (controlFlowTriggerId)
+		val String functionalInterfaceName = packageName + ".IControlFlowTrigger" + (controlFlowTriggerId)
+									
+//		val consumableFunctionalInterface = controlFlowTrigger.toClass(
+//			functionalInterfaceName,
+//			[
+//				annotations += controlFlowTrigger.toAnnotationRefWithStringPair("org.aspectj.lang.annotation.Aspect",
+//					Pair.of("pointcut", aopExpression))
+//				interface = true
+//				members += controlFlowTrigger.toMethod("trigger" + controlFlowTriggerId, typeRef("void"), [
+//					static = false
+//					^default = false
+//					abstract = true
+//					visibility = JvmVisibility.PUBLIC
+//					if(controlFlowTrigger.classType.full !== null){
+//						parameters += controlFlowTrigger.toParameter(controlFlowTrigger.classType.full.name, controlFlowTrigger.classType.full.parameterType)
+//					}
+//					controlFlowTrigger.params.args.filter([full !== null]).forEach [ p |
+//									parameters += controlFlowTrigger.toParameter(p.full.name, p.full.parameterType)
+//									]
+////					controlFlowTrigger.params.args.filter([]).forEach [ p |
+////									parameters += controlFlowTrigger.toParameter(p.partial.name)
+////					]
+//				])
+//			])
+////
+//		acceptor.accept(
+//			consumableFunctionalInterface
+//		)
+
+		val containingEvent = findFirstAncestorOfType(controlFlowTrigger, Event)
+		val JvmGenericType eventClass = containingEvent
+										.jvmElements
+										.filter(JvmGenericType)
+										.filter[t | t.superTypes.map[st | st.qualifiedName].exists[s | s.equals("mt.edu.um.cs.rv.events.Event")]]
+										.head
+		val JvmGenericType eventBuilderClass = containingEvent
+										.jvmElements
+										.filter(JvmGenericType)
+										.filter[t | t.superTypes.map[st | st.qualifiedName].forall[s | !s.equals("mt.edu.um.cs.rv.events.Event")]]
+										.head
+		
+		val monitorTriggerClass = controlFlowTrigger.toClass(
+			className,
+			[
+				//superTypes += typeRef(functionalInterfaceName)
+					annotations += annotationRef("org.aspectj.lang.annotation.Aspect")
+				
+					members += controlFlowTrigger.toMethod("accept", typeRef("void"), [
+					static = false
+					visibility = JvmVisibility.PUBLIC
+//					//annotations += annotationRef("java.lang.annotation.Override")
+					annotations += beforeOrAfter(controlFlowTrigger)
+					if(controlFlowTrigger.classType.full !== null){
+						parameters += controlFlowTrigger.toParameter("jp", typeRef("org.aspectj.lang.JoinPoint"))
+					}
+					controlFlowTrigger.params.args.filter([full !== null]).forEach [ p |
+									parameters += controlFlowTrigger.toParameter(p.full.name, p.full.parameterType)
+									]
+					if(controlFlowTrigger.execPoint !== null){
+						if(controlFlowTrigger.execPoint.exit !== null){
+							parameters += controlFlowTrigger.toParameter(controlFlowTrigger.execPoint.exit.ret.name, controlFlowTrigger.execPoint.exit.ret.parameterType)
+						}
+						if(controlFlowTrigger.execPoint.uponThrow !== null){
+							parameters += controlFlowTrigger.toParameter(controlFlowTrigger.execPoint.uponThrow.exception, typeRef("Exception"))
+						}
+					}
+					body =
+					'''	
+					«IF (controlFlowTrigger.classType.full !== null)»
+							«controlFlowTrigger.classType.full.parameterType» «controlFlowTrigger.classType.full.name» = («controlFlowTrigger.classType.full.parameterType») jp.getTarget(); 
+					«ENDIF»
+														
+					«eventBuilderClass.qualifiedName» eventBuilder = new «eventBuilderClass.qualifiedName»();
+					
+					//for all event parameters
+					«FOR param : containingEvent.eventFormalParameters.parameters»
+						eventBuilder.set«param.name.toFirstUpper»(
+							build«param.name.toFirstUpper»(«String.join(", ", controlFlowParams(controlFlowTrigger))»)
+						);
+					«ENDFOR»
+					
+					//build the event and mark it as a synchronous event
+					«eventClass.qualifiedName» event = eventBuilder.build(true);
+					
+					if 	(
+							shouldFireEvent
+							(
+								«containingEvent.eventFormalParameters.parameters.stream.map[p | "event.get" + p.name.toFirstUpper + "()"].collect(Collectors.joining(", "))»
+							)
+						) 
+						{
+							MonitorResult result = this.fireEvent(event);
+							
+							System.out.println(result.getStatus().getDescription());
+						}
+					else {
+						System.out.println("ok");
+						}
+						
+					'''
+				])
+				
+				members += controlFlowTrigger.toMethod("fireEvent", typeRef("mt.edu.um.cs.rv.monitors.results.MonitorResult"),[
+					static = false
+					visibility = JvmVisibility.PRIVATE
+					parameters += controlFlowTrigger.toParameter("event", typeRef("mt.edu.um.cs.rv.events.Event"))
+					
+					body = 
+					'''
+					mt.edu.um.cs.rv.eventmanager.observers.DirectInvocationEventObserver observer = mt.edu.um.cs.rv.eventmanager.observers.DirectInvocationEventObserver.getInstance();
+					
+					java.util.concurrent.Future<mt.edu.um.cs.rv.monitors.results.MonitorResult<?>> monitorResultFuture = observer.observeEvent(event);
+					try {
+						return monitorResultFuture.get();
+					} catch (InterruptedException ex) {
+					    //TODO LOGGER.error("InterruptedException while getting monitor result", ex);
+					    return MonitorResult.failure(null, ex);
+					} catch (Throwable t) {
+					    //TOOD LOGGER.error("Unexpected Throwable while getting monitor result", t);
+					    return MonitorResult.failure(null, t);
+					}
+					'''	
+				]
+				)
+				
+				members += controlFlowTrigger.toMethod("shouldFireEvent", typeRef(boolean),[
+					static = false
+					visibility = JvmVisibility.PRIVATE
+					containingEvent.eventFormalParameters.parameters.forEach [ p |
+						parameters += controlFlowTrigger.toParameter(p.name, p.parameterType)
+					]
+					//default implementation is to return true, otherwise this will be overridden by the when clause
+					body = 
+					'''
+					return true;
+					'''	
+				]
+				)
+			]
+		)
+		
+		containingEvent.eventFormalParameters.parameters.forEach[ ep |
+			monitorTriggerClass.members += 
+				controlFlowTrigger.toMethod("build"+ep.name.toFirstUpper, 
+					ep.parameterType,
+					[
+						static = false
+						visibility = JvmVisibility.PRIVATE
+						//add all available parameters to the method
+						if(controlFlowTrigger.classType.full !== null){
+							parameters += controlFlowTrigger.toParameter(controlFlowTrigger.classType.full.name, controlFlowTrigger.classType.full.parameterType)
+						}
+						controlFlowTrigger.params.args.filter([full !== null]).forEach [ p |
+										parameters += controlFlowTrigger.toParameter(p.full.name, p.full.parameterType)
+										]
+						if(controlFlowTrigger.execPoint !== null){
+							if(controlFlowTrigger.execPoint.exit !== null){
+								parameters += controlFlowTrigger.toParameter(controlFlowTrigger.execPoint.exit.ret.name, controlFlowTrigger.execPoint.exit.ret.parameterType)
+							}
+							if(controlFlowTrigger.execPoint.uponThrow !== null){
+								parameters += controlFlowTrigger.toParameter(controlFlowTrigger.execPoint.uponThrow.exception, typeRef("Exception"))
+							}		
+						}
+						//this is the default implementation, if a where is defined, it will be overridden once the where declaration is processed
+						body = '''return «ep.name»;'''
+					]
+				)
+		]
+
+		acceptor.accept(
+			monitorTriggerClass
+		)
 	}
 
 	override handleEventTrigger(EventTrigger eventTrigger, Boolean additionalTrigger) {
@@ -367,28 +725,28 @@ public class JavaInferrerHandler extends InferrerHandler {
 				members += monitorTrigger.toMethod("accept", typeRef("mt.edu.um.cs.rv.monitors.results.MonitorResult"), [
 					static = false
 					visibility = JvmVisibility.PUBLIC
-					annotations += annotationRef(Override)
+					//annotations += annotationRef("java.lang.annotation.Override")
 					monitorTrigger.params.parameters.forEach [ p |
 						parameters += monitorTrigger.toParameter(p.name, p.parameterType)
 					]
 					body = 
 					'''				
-					Â«eventBuilderClass.qualifiedNameÂ» eventBuilder = new Â«eventBuilderClass.qualifiedNameÂ»();
+					«eventBuilderClass.qualifiedName» eventBuilder = new «eventBuilderClass.qualifiedName»();
 					
 					//for all event parameters
-					Â«FOR param : containingEvent.eventFormalParameters.parametersÂ»
-						eventBuilder.setÂ«param.name.toFirstUpperÂ»(
-							buildÂ«param.name.toFirstUpperÂ»(Â«monitorTrigger.params.parameters.stream.map[p | p.name].collect(Collectors.joining(", "))Â»)
+					«FOR param : containingEvent.eventFormalParameters.parameters»
+						eventBuilder.set«param.name.toFirstUpper»(
+							build«param.name.toFirstUpper»(«monitorTrigger.params.parameters.stream.map[p | p.name].collect(Collectors.joining(", "))»)
 						);
-					Â«ENDFORÂ»
+					«ENDFOR»
 					
 					//build the event and mark it as a synchronous event
-					Â«eventClass.qualifiedNameÂ» event = eventBuilder.build(true);
+					«eventClass.qualifiedName» event = eventBuilder.build(true);
 					
 					if 	(
 							shouldFireEvent
 							(
-								Â«containingEvent.eventFormalParameters.parameters.stream.map[p | "event.get" + p.name.toFirstUpper + "()"].collect(Collectors.joining(", "))Â»
+								«containingEvent.eventFormalParameters.parameters.stream.map[p | "event.get" + p.name.toFirstUpper + "()"].collect(Collectors.joining(", "))»
 							)
 						) 
 						{
@@ -453,7 +811,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 						]		
 						
 						//this is the default implementation, if a where is defined, it will be overridden once the where declaration is processed
-						body = '''return Â«ep.nameÂ»;'''
+						body = '''return «ep.name»;'''
 					]
 				)
 		]
@@ -494,21 +852,21 @@ public class JavaInferrerHandler extends InferrerHandler {
 					^default = false
 					abstract = false
 					visibility = JvmVisibility.PUBLIC
-					body = '''return Â«eventClass.qualifiedNameÂ».class;'''
+					body = '''return «eventClass.qualifiedName».class;'''
 				])
 				members += externalTrigger.toMethod("forTriggerData", typeRef(Class, externalTrigger.dataClass), [
 					static = false
 					^default = false
 					abstract = false
 					visibility = JvmVisibility.PUBLIC
-					body = '''return Â«externalTrigger.dataClass.qualifiedNameÂ».class;'''
+					body = '''return «externalTrigger.dataClass.qualifiedName».class;'''
 				])
 				members += externalTrigger.toMethod("forTrigger", typeRef(Class, externalTrigger.triggerClass), [
 					static = false
 					^default = false
 					abstract = false
 					visibility = JvmVisibility.PUBLIC
-					body = '''return Â«externalTrigger.triggerClass.qualifiedNameÂ».class;'''
+					body = '''return «externalTrigger.triggerClass.qualifiedName».class;'''
 				])
 				members += externalTrigger.toMethod("build", typeRef(eventClass), [
 					static = false
@@ -519,13 +877,13 @@ public class JavaInferrerHandler extends InferrerHandler {
 					parameters += externalTrigger.toParameter("synchronous", typeRef(Boolean))
 					body = '''
 						//create event builder
-						Â«eventBuilderClass.qualifiedNameÂ» eventBuilder = new Â«eventBuilderClass.qualifiedNameÂ»();
+						«eventBuilderClass.qualifiedName» eventBuilder = new «eventBuilderClass.qualifiedName»();
 
 						//for all event parameters
-						Â«FOR param : containingEvent.eventFormalParameters.parametersÂ»
-							eventBuilder.setÂ«param.name.toFirstUpperÂ»(buildÂ«param.name.toFirstUpperÂ»(Â«externalTrigger.dataClassVariableÂ»));
-						Â«ENDFORÂ»
-						Â«eventClass.qualifiedNameÂ» event = eventBuilder.build();
+						«FOR param : containingEvent.eventFormalParameters.parameters»
+							eventBuilder.set«param.name.toFirstUpper»(build«param.name.toFirstUpper»(«externalTrigger.dataClassVariable»));
+						«ENDFOR»
+						«eventClass.qualifiedName» event = eventBuilder.build();
 						event.setSynchronous(synchronous);
 						return event;
 					'''
@@ -537,7 +895,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 					visibility = JvmVisibility.PUBLIC
 					parameters += externalTrigger.toParameter("e", typeRef(eventClass))
 					body = '''
-						return _shouldFireEvent(Â«containingEvent.eventFormalParameters.parameters.stream.map[p | "e.get" + p.name.toFirstUpper + "()"].collect(Collectors.joining(", "))Â»);
+						return _shouldFireEvent(«containingEvent.eventFormalParameters.parameters.stream.map[p | "e.get" + p.name.toFirstUpper + "()"].collect(Collectors.joining(", "))»);
 					'''
 				])
 				members += externalTrigger.toMethod("_shouldFireEvent", typeRef(Boolean), [
@@ -551,8 +909,8 @@ public class JavaInferrerHandler extends InferrerHandler {
 					
 					//if event declaration has a when block
 					val whenClause = containingEvent.eventBody.when
-					if ((whenClause != null) && (whenClause.condition != null) && (whenClause.condition.block != null)){
-						if (whenClause.condition.block.simple != null){
+					if ((whenClause !== null) && (whenClause.condition !== null) && (whenClause.condition.block !== null)){
+						if (whenClause.condition.block.simple !== null){
 							body = whenClause.condition.block.simple	
 						} else {
 							body = whenClause.condition.block.complex
@@ -574,7 +932,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 								parameters += externalTrigger.toParameter(externalTrigger.dataClassVariable, externalTrigger.dataClass)
 								
 								//this is the default implementation, if a where is defined, it will be overridden once the where declaration is processed
-								body = '''return Â«externalTrigger.dataClassVariableÂ»;'''
+								body = '''return «externalTrigger.dataClassVariable»;'''
 							]
 						)
 				]
@@ -600,15 +958,15 @@ public class JavaInferrerHandler extends InferrerHandler {
 		val buildMethodName = "build" + whereClause.whereId.toFirstUpper
 		var trigger = containingEvent.eventBody.trigger
 		var additionalTrigger = containingEvent.eventBody.additionalTrigger 
-		while (trigger != null)
+		while (trigger !== null)
 		{
 			//NOTE: assumes that the where declaration references a valid event parameters
 			
 			//TODO handle other types of triggers as necessary
 			var JvmOperation buildMethod = null
-			if ((trigger.monitorTrigger != null) || (trigger.externalTrigger != null)){
+			if ((trigger.monitorTrigger !== null) || (trigger.externalTrigger !== null) || (trigger.controlFlowTrigger !== null)){
 				
-				if (trigger.monitorTrigger != null) {
+				if (trigger.monitorTrigger !== null) {
 					buildMethod = trigger.monitorTrigger
 						.jvmElements
 						.filter(JvmOperation)
@@ -617,7 +975,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 						].head	
 				} 
 				
-				if (trigger.externalTrigger != null) {
+				if (trigger.externalTrigger !== null) {
 					buildMethod = trigger.externalTrigger
 						.jvmElements
 						.filter(JvmOperation)
@@ -626,9 +984,18 @@ public class JavaInferrerHandler extends InferrerHandler {
 						].head	
 				}
 				
+				if (trigger.controlFlowTrigger !== null) {
+					buildMethod = trigger.controlFlowTrigger
+						.jvmElements
+						.filter(JvmOperation)
+						.filter [ op |
+							op.simpleName.equals(buildMethodName)
+						].head	
+				}
+				
 				//TODO fix the order of this block, this if should be on the outside for performance reasons
-				if (whereClause.whereExpression != null){
-					if (whereClause.whereExpression.simple != null){
+				if (whereClause.whereExpression !== null){
+					if (whereClause.whereExpression.simple !== null){
 						buildMethod.body = whereClause.whereExpression.simple	
 					} else {
 						buildMethod.body = whereClause.whereExpression.complex
@@ -639,7 +1006,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 			
 			//last step is to handle additional triggers
 			trigger = null
-			if (additionalTrigger != null){
+			if (additionalTrigger !== null){
 				trigger = additionalTrigger.trigger	
 			}
 		}
@@ -651,10 +1018,10 @@ public class JavaInferrerHandler extends InferrerHandler {
 		//for each trigger, override the shouldFireEvent method
 		var trigger = containingEvent.eventBody.trigger
 		var additionalTrigger = containingEvent.eventBody.additionalTrigger 
-		while (trigger != null)
+		while (trigger !== null)
 		{	
 			//TODO handle other types of triggers as necessary
-			if (trigger.monitorTrigger != null){
+			if (trigger.monitorTrigger !== null){
 				val buildMethod = trigger.monitorTrigger
 					.jvmElements
 					.filter(JvmOperation)
@@ -663,8 +1030,8 @@ public class JavaInferrerHandler extends InferrerHandler {
 					].head
 				
 				
-				if ((whenClause.condition != null) && (whenClause.condition.block != null)){
-					if (whenClause.condition.block.simple != null){
+				if ((whenClause.condition !== null) && (whenClause.condition.block !== null)){
+					if (whenClause.condition.block.simple !== null){
 						buildMethod.body = whenClause.condition.block.simple	
 					} else {
 						buildMethod.body = whenClause.condition.block.complex
@@ -675,7 +1042,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 			
 			//last step is to handle additional triggers
 			trigger = null
-			if (additionalTrigger != null){
+			if (additionalTrigger !== null){
 				trigger = additionalTrigger.trigger	
 			}
 		}
@@ -736,14 +1103,14 @@ public class JavaInferrerHandler extends InferrerHandler {
 				members += condition.toMethod("apply", typeRef(boolean), [
 					static = false
 					visibility = JvmVisibility.PUBLIC
-					annotations += annotationRef(Override)
+					//annotations += annotationRef("java.lang.annotation.Override")
 					condition.conditionFormalParameters.parameters.forEach [ p |
 						parameters += condition.toParameter(p.name, p.parameterType)
 					]
 
-					if (condition.conditionExpression.ref != null) {
+					if (condition.conditionExpression.ref !== null) {
 						body = condition.conditionExpression.ref
-					} else if (condition.conditionExpression.block.simple != null) {
+					} else if (condition.conditionExpression.block.simple !== null) {
 						body = condition.conditionExpression.block.simple
 					} else {
 						body = condition.conditionExpression.block.complex
@@ -801,15 +1168,15 @@ public class JavaInferrerHandler extends InferrerHandler {
 				members += action.toMethod("accept", typeRef("mt.edu.um.cs.rv.monitors.results.MonitorResult"), [
 					static = false
 					visibility = JvmVisibility.PUBLIC
-					annotations += annotationRef(Override)
+					//annotations += annotationRef("java.lang.annotation.Override")
 					action.actionFormalParameters.parameters.forEach [ p |
 						parameters += action.toParameter(p.name, p.parameterType)
 					]
 					//if the action is not returning a returning a result, then we need to wrap
-					if (action.isVoid != null) {
+					if (action.isVoid !== null) {
 						body = '''
 							this._accept(
-								Â«action.actionFormalParameters.parameters.stream.map[p | p.name].collect(Collectors.joining(", "))Â»
+								«action.actionFormalParameters.parameters.stream.map[p | p.name].collect(Collectors.joining(", "))»
 							);
 							return mt.edu.um.cs.rv.monitors.results.MonitorResult.ok();
 						'''
@@ -821,7 +1188,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 				])
 				
 				//if the action is not returning a returning a result, then we need to wrap
-				if (action.isVoid != null) { 
+				if (action.isVoid !== null) { 
 					members += action.toMethod("_accept", typeRef(void), [
 						static = false
 						visibility = JvmVisibility.PRIVATE
@@ -851,7 +1218,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 		var ruleWithoutBodyAndCondition = basicRule.event.eventRefId.name + "(" +
 			actualParametersAsString(basicRule.event.eventActualParameters) + ") "
 
-		if (basicRule.condition != null) {
+		if (basicRule.condition !== null) {
 			ruleWithoutBodyAndCondition = ruleWithoutBodyAndCondition + ' | { .. } '
 		}
 
@@ -869,7 +1236,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 										.filter[t | t.superTypes.map[st | st.qualifiedName].contains("mt.edu.um.cs.rv.events.Event") ]
 										.head
 
-		if (eventClass == null) {
+		if (eventClass === null) {
 			// TODO error nicely
 			println("WWWWWAAAAAAAAAAAAAAAA")
 			return
@@ -889,7 +1256,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 
 		var JvmGenericType monitorClass = basicRule.toClass(className, [
 			static = false
-			if (stateClass != null) {
+			if (stateClass !== null) {
 				superTypes += typeRef("mt.edu.um.cs.rv.monitors.Monitor", typeRef(stateClass))
 			}
 			else {
@@ -908,7 +1275,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 				}
 			]
 			
-			if (stateClass != null) {
+			if (stateClass !== null) {
 				allParams.add(new Pair<String, JvmTypeReference>("state", typeRef(stateClass)))
 				allParamNames.add("state")
 				allActualParams.add("state")
@@ -951,8 +1318,8 @@ public class JavaInferrerHandler extends InferrerHandler {
 				[
 					static = false
 					visibility = JvmVisibility.PUBLIC
-					annotations += annotationRef(Override)
-					body = '''return java.util.Collections.singleton(Â«eventClass.fullyQualifiedNameÂ».class);'''
+					//annotations += annotationRef("java.lang.annotation.Override")
+					body = '''return java.util.Collections.singleton(«eventClass.fullyQualifiedName».class);'''
 				]
 			)
 
@@ -962,7 +1329,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 				[
 					static = false
 					visibility = JvmVisibility.PUBLIC
-					annotations += annotationRef(Override)
+					//annotations += annotationRef("java.lang.annotation.Override")
 					body = '''return this.toString();'''
 				]
 			)
@@ -974,7 +1341,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 					static = false
 					visibility = JvmVisibility.PRIVATE
 					parameters += basicRule.toParameter("e", typeRef(eventClass))
-					if (stateClass != null) {
+					if (stateClass !== null) {
 						parameters += basicRule.toParameter("state", typeRef(stateClass))
 					}
 					else {
@@ -983,7 +1350,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 
 					body = '''
 						return this._evaluateCondition(
-							Â«allActualParams.stream.collect(Collectors.joining(", "))Â»
+							«allActualParams.stream.collect(Collectors.joining(", "))»
 						);
 					'''
 				]
@@ -1000,14 +1367,14 @@ public class JavaInferrerHandler extends InferrerHandler {
 //					]
 					allParams.forEach[p| parameters += basicRule.toParameter(p.key, p.value)]
 
-					if (basicRule.condition == null){
+					if (basicRule.condition === null){
 						// if no condition has been specified, then return true
 						body = '''return true;'''
-					} else if ((basicRule.condition.block != null) && (basicRule.condition.block.simple != null)) { 
+					} else if ((basicRule.condition.block !== null) && (basicRule.condition.block.simple !== null)) { 
 						body = basicRule.condition.block.simple
-					} else if ((basicRule.condition.block != null) && (basicRule.condition.block.complex != null)) {
+					} else if ((basicRule.condition.block !== null) && (basicRule.condition.block.complex !== null)) {
 						body = basicRule.condition.block.complex
-					} else if (basicRule.condition.ref != null) {
+					} else if (basicRule.condition.ref !== null) {
 						body = basicRule.condition.ref							
 					} 
 				]
@@ -1021,7 +1388,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 					static = false
 					visibility = JvmVisibility.PRIVATE
 					parameters += basicRule.toParameter("e", typeRef(eventClass))
-					if (stateClass != null) {
+					if (stateClass !== null) {
 						parameters += basicRule.toParameter("state", typeRef(stateClass))
 					}
 					else {
@@ -1030,7 +1397,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 
 					body = '''
 						return this._performEventActions(
-							Â«allActualParams.stream.collect(Collectors.joining(", "))Â»
+							«allActualParams.stream.collect(Collectors.joining(", "))»
 						);
 					'''	
 				]
@@ -1048,11 +1415,11 @@ public class JavaInferrerHandler extends InferrerHandler {
 //					]
 					allParams.forEach[p| parameters += basicRule.toParameter(p.key, p.value)]
 						
-					if (basicRule.ruleAction.actionBlock != null) {
+					if (basicRule.ruleAction.actionBlock !== null) {
 						body = basicRule.ruleAction.actionBlock
-					} else if (basicRule.ruleAction.actionRefInvocation != null) {
+					} else if (basicRule.ruleAction.actionRefInvocation !== null) {
 						body = basicRule.ruleAction.actionRefInvocation
-					} else if (basicRule.ruleAction.actionMonitorTriggerFire != null) {
+					} else if (basicRule.ruleAction.actionMonitorTriggerFire !== null) {
 						body = basicRule.ruleAction.actionMonitorTriggerFire
 					}
 				]
@@ -1064,17 +1431,17 @@ public class JavaInferrerHandler extends InferrerHandler {
 				[
 					static = false
 					visibility = JvmVisibility.PUBLIC
-					annotations += annotationRef(Override)
+					//annotations += annotationRef("java.lang.annotation.Override")
 					parameters += basicRule.toParameter("e", typeRef("mt.edu.um.cs.rv.events.Event"))
-					if (stateClass != null) {
+					if (stateClass !== null) {
 						parameters += basicRule.toParameter("s", typeRef(stateClass))
 					}
 					else {
 						parameters += basicRule.toParameter("s", typeRef("mt.edu.um.cs.rv.monitors.state.State"))
 					}
 					body = '''
-						if (e instanceof Â«eventClass.qualifiedNameÂ») {
-							Â«eventClass.qualifiedNameÂ» event = (Â«eventClass.qualifiedNameÂ») e;
+						if (e instanceof «eventClass.qualifiedName») {
+							«eventClass.qualifiedName» event = («eventClass.qualifiedName») e;
 							if (evaluateCondition(event, s)) {
 								return this.performEventActions(event, s);
 							}
@@ -1098,15 +1465,15 @@ public class JavaInferrerHandler extends InferrerHandler {
 				[
 					static = false
 					visibility = JvmVisibility.PUBLIC
-					annotations += annotationRef(Override)
+					//annotations += annotationRef("java.lang.annotation.Override")
 					// TODO clean this 
-					body = '''return "Â«toStringBodyÂ»";'''
+					body = '''return "«toStringBody»";'''
 				]
 			)
 
 		])
 
-		if (monitorClass != null) {
+		if (monitorClass !== null) {
 			acceptor.accept(
 				monitorClass
 			)
@@ -1141,7 +1508,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 	def isTopLevelEObject(EObject eObject){
 		val valourBody = findFirstAncestorOfType(eObject, ValourBody)
 		
-		if (valourBody == null) {
+		if (valourBody === null) {
 			throw new IllegalStateException("Provided eObject is not contained within at least one ValourBody")
 		}
 		
@@ -1149,7 +1516,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 		//get the ValourBody container of the ValourBody container of the BasicRule
 		val parentValourBody = findFirstAncestorOfType(valourBodyContainer, ValourBody)
 		//then BasicRule is top level rule and needs to be registered with the MonitorRegistry
-		return parentValourBody == null
+		return parentValourBody === null
 	}
 
 	def handleBasicRuleMonitorRegistration(BasicRule basicRule, JvmGenericType monitorClass, JvmGenericType eventClass) {
@@ -1219,7 +1586,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 			stateClassName,
 			[
 				static = false
-				if (parentStateClass != null) {
+				if (parentStateClass !== null) {
 					superTypes += typeRef("mt.edu.um.cs.rv.monitors.state.State", parentStateClass)
 				}
 				else {
@@ -1232,7 +1599,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 						s.type,
 						[
 							visibility = JvmVisibility.PUBLIC
-							if (s.valueExpression.simple != null) {
+							if (s.valueExpression.simple !== null) {
 								initializer = s.valueExpression.simple
 							} else {
 								initializer = s.valueExpression.complex
@@ -1265,7 +1632,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 					[
 						static = false
 						visibility = JvmVisibility.PROTECTED
-						annotations += annotationRef(Override)
+						//annotations += annotationRef("java.lang.annotation.Override")
 						// setting the body to empty, this is then set in handleStateBlockEnd() using the content of monitorEventRequirementsStack
 						body = ''''''
 					]
@@ -1277,7 +1644,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 					[
 						static = false
 						visibility = JvmVisibility.PROTECTED
-						annotations += annotationRef(Override)
+						//annotations += annotationRef("java.lang.annotation.Override")
 						// setting the body to empty, this is then set in handleStateBlockEnd() using the content of monitorEventRequirementsStack
 						body = ''''''
 					]
@@ -1289,14 +1656,14 @@ public class JavaInferrerHandler extends InferrerHandler {
 					[
 						static = false
 						visibility = JvmVisibility.PROTECTED
-						annotations += annotationRef(Override)
+						//annotations += annotationRef("java.lang.annotation.Override")
 						body = '''
 							try {
-								return Â«stateClassNameÂ».class.newInstance();
+								return «stateClassName».class.newInstance();
 							} catch (InstantiationException | IllegalAccessException e) {
 								// TODO Auto-generated catch block
 								e.printStackTrace();
-								throw new RuntimeException("Unable to create new state instance of Â«stateClassNameÂ»");
+								throw new RuntimeException("Unable to create new state instance of «stateClassName»");
 							}
 						'''
 					]
@@ -1308,7 +1675,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 					[
 						static = false
 						visibility = JvmVisibility.PUBLIC
-						annotations += annotationRef(Override)
+						//annotations += annotationRef("java.lang.annotation.Override")
 						body = '''return this.toString();'''
 					]
 				)
@@ -1319,8 +1686,8 @@ public class JavaInferrerHandler extends InferrerHandler {
 					[
 						static = false
 						visibility = JvmVisibility.PUBLIC
-						annotations += annotationRef(Override)
-						body = '''return "Â«stateDelegatingMonitorFullClassNameÂ»";'''
+						//annotations += annotationRef("java.lang.annotation.Override")
+						body = '''return "«stateDelegatingMonitorFullClassName»";'''
 					]
 				)
 			]
@@ -1334,7 +1701,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 	def JvmTypeReference getParentStateClassIfExists(EObject context) {
 		val containingRule = findFirstAncestorOfType(context, Rule)
 		val parentRule = findParentRule(containingRule)
-		if (parentRule != null) {
+		if (parentRule !== null) {
 			var JvmGenericType parentStateClass = null
 
 			if (parentRule instanceof StateBlock) {
@@ -1347,7 +1714,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 				// TODO	
 			}
 
-			if (parentStateClass != null) {
+			if (parentStateClass !== null) {
 				return typeRef(parentStateClass)
 			}
 		}
@@ -1371,9 +1738,9 @@ public class JavaInferrerHandler extends InferrerHandler {
 		].head
 		initialiseRequiredEventsMethod.body = '''
 			//set all required events 
-			Â«FOR e : allEventsÂ»
-				this.addRequiredEvent(Â«eÂ».class);
-			Â«ENDFORÂ»
+			«FOR e : allEvents»
+				this.addRequiredEvent(«e».class);
+			«ENDFOR»
 		'''
 
 
@@ -1383,15 +1750,15 @@ public class JavaInferrerHandler extends InferrerHandler {
 		initialiseInterestedMonitorTypesForEventMethod.body = '''
 			//initialise map of events and the respective interested monitors
 			java.util.List<Class<? extends mt.edu.um.cs.rv.monitors.Monitor>> list;			
-			Â«FOR e : eventMonitors.keySetÂ»
+			«FOR e : eventMonitors.keySet»
 				list = new java.util.ArrayList();
-				Â«FOR m : eventMonitors.get(e)Â»
+				«FOR m : eventMonitors.get(e)»
 					//prepare the list for the interestedMonitorTypesForEvent map
-					list.add(Â«mÂ».class);
-				Â«ENDFORÂ»
+					list.add(«m».class);
+				«ENDFOR»
 				
-				this.addInterestedMonitorTypesForEvent(Â«eÂ».class, list); 
-			Â«ENDFORÂ»
+				this.addInterestedMonitorTypesForEvent(«e».class, list); 
+			«ENDFOR»
 		'''
 		
 		val monitorClass = block.jvmElements.filter(JvmGenericType).filter [ c |
@@ -1421,7 +1788,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 			stateClassName,
 			[
 				static = false
-				if (parentStateClass != null) {
+				if (parentStateClass !== null) {
 					superTypes += typeRef("mt.edu.um.cs.rv.monitors.state.State", parentStateClass)
 				}
 				else {
@@ -1434,7 +1801,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 						s.type,
 						[
 							visibility = JvmVisibility.PUBLIC
-							if (s.valueExpression.simple != null) {
+							if (s.valueExpression.simple !== null) {
 								initializer = s.valueExpression.simple
 							} else {
 								initializer = s.valueExpression.complex
@@ -1463,7 +1830,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 					[
 						static = false
 						visibility = JvmVisibility.PROTECTED
-						annotations += annotationRef(Override)
+						//annotations += annotationRef("java.lang.annotation.Override")
 						// setting the body to empty, this is then set in handleForEachBlockEnd() using the content of monitorEventRequirementsStack
 						body = ''''''
 					]
@@ -1475,7 +1842,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 					[
 						static = false
 						visibility = JvmVisibility.PROTECTED
-						annotations += annotationRef(Override)
+						//annotations += annotationRef("java.lang.annotation.Override")
 						// setting the body to empty, this is then set in handleForEachBlockEnd() using the content of monitorEventRequirementsStack
 						body = ''''''
 					]
@@ -1487,14 +1854,14 @@ public class JavaInferrerHandler extends InferrerHandler {
 					[
 						static = false
 						visibility = JvmVisibility.PROTECTED
-						annotations += annotationRef(Override)
+						//annotations += annotationRef("java.lang.annotation.Override")
 						body = '''
 							try {
-								return Â«forEachStateClassÂ».class.newInstance();
+								return «forEachStateClass».class.newInstance();
 							} catch (InstantiationException | IllegalAccessException e) {
 								// TODO Auto-generated catch block
 								e.printStackTrace();
-								throw new RuntimeException("Unable to create new state instance of Â«stateClassNameÂ»");
+								throw new RuntimeException("Unable to create new state instance of «stateClassName»");
 							}
 						'''
 					]
@@ -1506,7 +1873,7 @@ public class JavaInferrerHandler extends InferrerHandler {
 					[
 						static = false
 						visibility = JvmVisibility.PUBLIC
-						annotations += annotationRef(Override)
+						//annotations += annotationRef("java.lang.annotation.Override")
 						body = '''return this.toString();'''
 					]
 				)
@@ -1517,8 +1884,8 @@ public class JavaInferrerHandler extends InferrerHandler {
 					[
 						static = false
 						visibility = JvmVisibility.PUBLIC
-						annotations += annotationRef(Override)
-						body = '''return "Â«classNameÂ»";'''
+						//annotations += annotationRef("java.lang.annotation.Override")
+						body = '''return "«className»";'''
 					]
 				)
 			]
@@ -1543,9 +1910,9 @@ public class JavaInferrerHandler extends InferrerHandler {
 		].head
 		initialiseRequiredEventsMethod.body = '''
 			//set all required events 
-			Â«FOR e : allEventsÂ»
-				this.addRequiredEvent(Â«eÂ».class);
-			Â«ENDFORÂ»
+			«FOR e : allEvents»
+				this.addRequiredEvent(«e».class);
+			«ENDFOR»
 		'''
 		
 		val initialiseInterestedMonitorTypesForEventMethod = forEach.jvmElements.filter(JvmOperation).filter [ op |
@@ -1554,15 +1921,15 @@ public class JavaInferrerHandler extends InferrerHandler {
 		initialiseInterestedMonitorTypesForEventMethod.body = '''
 			//initialise map of events and the respective interested monitors
 			java.util.List<Class<? extends mt.edu.um.cs.rv.monitors.Monitor>> list;			
-			Â«FOR e : eventMonitors.keySetÂ»
+			«FOR e : eventMonitors.keySet»
 				list = new java.util.ArrayList();
-				Â«FOR m : eventMonitors.get(e)Â»
+				«FOR m : eventMonitors.get(e)»
 					//prepare the list for the interestedMonitorTypesForEvent map
-					list.add(Â«mÂ».class);
-				Â«ENDFORÂ»
+					list.add(«m».class);
+				«ENDFOR»
 				
-				this.addInterestedMonitorTypesForEvent(Â«eÂ».class, list); 
-			Â«ENDFORÂ»
+				this.addInterestedMonitorTypesForEvent(«e».class, list); 
+			«ENDFOR»
 		'''
 		
 		val monitorClass = forEach.jvmElements.filter(JvmGenericType).filter[ c | 
@@ -1620,17 +1987,17 @@ public class JavaInferrerHandler extends InferrerHandler {
 					'''
 						mt.edu.um.cs.rv.monitors.Monitor monitor;
 						
-						Â«FOR r : topLevelRulesÂ»
-							Â«val JvmGenericType monitorClass = getMonitorClassFromEObject(r)Â»
+						«FOR r : topLevelRules»
+							«val JvmGenericType monitorClass = getMonitorClassFromEObject(r)»
 							
-							Â«IF (monitorClass != null)Â»
-								monitor = new Â«monitorClass.qualifiedNameÂ»();
+							«IF (monitorClass !== null)»
+								monitor = new «monitorClass.qualifiedName»();
 								if (monitor instanceof mt.edu.um.cs.rv.monitors.StatefulMonitor) {
 									((mt.edu.um.cs.rv.monitors.StatefulMonitor) monitor).setMonitorPersistenceProvider(this.monitorPersistenceProvider);
 								}
 								this.monitorRegistry.registerNewMonitor(monitor);
-							Â«ENDIFÂ»
-						Â«ENDFORÂ»
+							«ENDIF»
+						«ENDFOR»
 					'''
 				])
 			]

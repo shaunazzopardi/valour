@@ -6,11 +6,16 @@ generate valour "http://www.edu.mt/um/cs/rv/valour"
 
 Model:
 	(imports=XImportSection)?
+	(mainPackage=MainPackageDeclaration)
 	body=ValourBody;
 
 ValourBody:
 	(declarations=Declarations)? //optional declarations block
 	rules=Rules;
+
+MainPackageDeclaration:
+	{MainPackageDeclaration} 'main' 'package' ':' package+=(QualifiedName) (',' package+=(QualifiedName))*
+;
 
 Declarations:
 	'declarations' '{'
@@ -30,8 +35,11 @@ Category:
 Event:
 	'event' name=ID '(' eventFormalParameters=FormalParameters ')' '=' '{' eventBody=EventBody '}';
 
+FormalParameter:
+	parameterType=JvmTypeReference name=ID;
+	
 FormalParameters:
-	{FormalParameters}(parameters+=FullJvmFormalParameter (',' parameters+=FullJvmFormalParameter)*)?;
+	{FormalParameters}(parameters+=FormalParameter (',' parameters+=FormalParameter)*)?;
 
 ActualParameters:
 	{ActualParameters}(parameters+=XExpression (',' parameters+=XExpression)*)?;
@@ -49,12 +57,43 @@ SimpleTrigger:
 	externalTrigger=ExternalTrigger)
 	(=> whereClauses=WhereClauses)?;
 
-ControlFlowTrigger:
-	'system' 'controlflow' 'trigger' aop=AopExpression;
 
-	//TODO change aop
-AopExpression:
-	expression=STRING;
+AspectJParameter:
+	(full=FormalParameter|ignoreOne="*"|ignoreAsNeeded="**");
+	
+AspectJParameters:
+	{AspectJParameters}((args+=AspectJParameter) (',' (args+=AspectJParameter))*)?;
+
+ControlFlowTrigger:
+	'system' 'controlflow' 'trigger' matchingType=MatchingType
+	'{' 
+		(classType=AspectJParameter '.')? (methodID=ID|'**') '(' (params=(AspectJParameters)) ')'
+	'}' (execPoint=ExecPoint)?;
+
+MatchingType:
+	exec=Execution|call=Call
+;
+
+Execution:
+	'executionsOf'
+;
+
+Call:
+	'callsTo'
+;
+
+ExecPoint:
+	{ExecPoint}
+	entry=UponEntry|exit=UponExit|uponThrow=UponThrow;
+
+UponExit:
+	'uponExit' '(' ret=FormalParameter ')';
+
+UponEntry:
+	'uponEntry';
+
+UponThrow:
+	'uponThrow' '(' exception=ID ')';
 
 EventTrigger:
 	'event' 'trigger' onEvent=[Event] '(' params=FormalParameters ')';

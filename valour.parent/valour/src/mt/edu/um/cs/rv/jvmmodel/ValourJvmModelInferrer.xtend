@@ -82,7 +82,7 @@ class ValourJvmModelInferrer extends AbstractModelInferrer {
 //   			for (greeting : element.greetings) {
 //   				members += greeting.toMethod("hello" + greeting.name, typeRef(String)) [
 //   					body = '''
-//							return "Hello Â«greeting.nameÂ»";
+//							return "Hello «greeting.name»";
 //   					'''
 //   				]
 //   			}

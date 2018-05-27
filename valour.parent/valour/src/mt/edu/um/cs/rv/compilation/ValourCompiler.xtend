@@ -27,10 +27,10 @@ class ValourCompiler extends XbaseCompiler {
 //			val actionClass = action.jvmElements.filter(JvmGenericType).filter[t|!t.isInterface].head
 //			val objectName = "action" + uuidName()
 //			
-//			appendable.append('''Â«actionClass.fullyQualifiedNameÂ» Â«objectNameÂ» = new Â«actionClass.fullyQualifiedNameÂ»();''')
+//			appendable.append('''«actionClass.fullyQualifiedName» «objectName» = new «actionClass.fullyQualifiedName»();''')
 //			appendable.newLine
 //			
-//			appendable.append('''Â«objectNameÂ».accept(''')
+//			appendable.append('''«objectName».accept(''')
 //			appendable.newLine
 //			
 //			appendArguments(actionParameters.parameters, appendable)
@@ -51,10 +51,10 @@ class ValourCompiler extends XbaseCompiler {
 //			val monitorTriggerClass = monitorTrigger.jvmElements.filter(JvmGenericType).filter[t|!t.isInterface].head
 //			val objectName = "monitorTrigger" + uuidName()
 //			
-//			appendable.append('''Â«monitorTriggerClass.fullyQualifiedNameÂ» Â«objectNameÂ» = new Â«monitorTriggerClass.fullyQualifiedNameÂ»();''')
+//			appendable.append('''«monitorTriggerClass.fullyQualifiedName» «objectName» = new «monitorTriggerClass.fullyQualifiedName»();''')
 //			appendable.newLine
 //			
-//			appendable.append('''Â«objectNameÂ».accept(''')
+//			appendable.append('''«objectName».accept(''')
 //			appendable.newLine
 //			
 //			appendArguments(monitorTriggerParemeters.parameters, appendable)
@@ -90,7 +90,7 @@ class ValourCompiler extends XbaseCompiler {
 			val conditionParameters = obj.params
 			val conditionClass = condition.jvmElements.filter(JvmGenericType).filter[t|!t.isInterface].head
 			
-			appendable.append('''new Â«conditionClass.fullyQualifiedNameÂ»().apply(''')
+			appendable.append('''new «conditionClass.fullyQualifiedName»().apply(''')
 			appendable.newLine
 			appendArguments(conditionParameters.parameters, appendable)
 			appendable.newLine
@@ -108,7 +108,7 @@ class ValourCompiler extends XbaseCompiler {
 			val monitorTriggerParemeters = obj.monitorTriggerActualParameters
 			val monitorTriggerClass = monitorTrigger.jvmElements.filter(JvmGenericType).filter[t|!t.isInterface].head
 			
-			appendable.append('''new Â«monitorTriggerClass.fullyQualifiedNameÂ»().accept(''')	
+			appendable.append('''new «monitorTriggerClass.fullyQualifiedName»().accept(''')	
 			appendArguments(monitorTriggerParemeters.parameters, appendable)
 			
 			appendable.newLine
@@ -126,7 +126,7 @@ class ValourCompiler extends XbaseCompiler {
 			val actionParameteres = obj.actionActualParameters
 			val actionClass = action.jvmElements.filter(JvmGenericType).filter[t|!t.isInterface].head
 			
-			appendable.append('''new Â«actionClass.fullyQualifiedNameÂ»().accept(''')
+			appendable.append('''new «actionClass.fullyQualifiedName»().accept(''')
 			appendable.newLine
 			appendArguments(actionParameteres.parameters, appendable)
 			appendable.newLine

@@ -94,42 +94,6 @@ public class JavaInferrerHandler extends InferrerHandler {
 
 		this.model = model
 		this.acceptor = acceptor
-
-		// TODO the package to which to generate the classes should be defined in the language ???
-		val packageName = packageNameToUse(model)
-
-		val String monitoringSystemClassName = packageName + ".MonitoringSystem"
-		var JvmGenericType monitoringSystemClass = model.toClass(
-			monitoringSystemClassName,
-			[
-				annotations += annotationRef("org.springframework.boot.autoconfigure.SpringBootApplication")
-				annotations += model.toAnnotationRef(
-					"org.springframework.context.annotation.Import",
-					Pair.of("value", typeRef("mt.edu.um.cs.rv.eventmanager.engine.config.EventManagerConfigration"))
-				)
-				annotations += model.toAnnotationRefWithStringPair(
-					"org.springframework.context.annotation.ComponentScan",
-					Pair.of("value", String.join(', ', model.mainPackage.package))
-				)
-				members += model.toMethod(
-					"main",
-					typeRef(void),
-					[
-						static = true
-						visibility = JvmVisibility.PUBLIC
-						parameters += model.toParameter("args", typeRef(String).addArrayTypeDimension)
-						body = '''
-							org.springframework.boot.SpringApplication.run(«monitoringSystemClassName».class, args);
-						'''
-					]
-				)
-
-			]
-		)
-
-		acceptor.accept(
-			monitoringSystemClass
-		)
 	}
 
 // TODO the package to which to generate the classes should be defined in the language ???
@@ -1023,6 +987,24 @@ public class JavaInferrerHandler extends InferrerHandler {
 			//TODO handle other types of triggers as necessary
 			if (trigger.monitorTrigger !== null){
 				val buildMethod = trigger.monitorTrigger
+					.jvmElements
+					.filter(JvmOperation)
+					.filter [ op |
+						op.simpleName.equals("shouldFireEvent")
+					].head
+				
+				
+				if ((whenClause.condition !== null) && (whenClause.condition.block !== null)){
+					if (whenClause.condition.block.simple !== null){
+						buildMethod.body = whenClause.condition.block.simple	
+					} else {
+						buildMethod.body = whenClause.condition.block.complex
+					}
+				}
+
+			} 
+			else if (trigger.controlFlowTrigger !== null){
+				val buildMethod = trigger.controlFlowTrigger
 					.jvmElements
 					.filter(JvmOperation)
 					.filter [ op |
@@ -2005,6 +1987,42 @@ public class JavaInferrerHandler extends InferrerHandler {
 		
 		acceptor.accept(
 			monitorRegistrationClass
+		)
+		
+		// TODO the package to which to generate the classes should be defined in the language ???
+		val modelPackageName = packageNameToUse(model)
+
+		val String monitoringSystemClassName = modelPackageName + ".MonitoringSystem"
+		var JvmGenericType monitoringSystemClass = model.toClass(
+			monitoringSystemClassName,
+			[
+				annotations += annotationRef("org.springframework.boot.autoconfigure.SpringBootApplication")
+				annotations += model.toAnnotationRefMultipleValues(
+					"org.springframework.context.annotation.Import",
+					Pair.of("value", #[typeRef("mt.edu.um.cs.rv.eventmanager.engine.config.EventManagerConfigration"), typeRef(className)])
+				)
+				annotations += model.toAnnotationRefWithStringPair(
+					"org.springframework.context.annotation.ComponentScan",
+					Pair.of("value", String.join(', ', model.mainPackage.package))
+				)
+				members += model.toMethod(
+					"main",
+					typeRef(void),
+					[
+						static = true
+						visibility = JvmVisibility.PUBLIC
+						parameters += model.toParameter("args", typeRef(String).addArrayTypeDimension)
+						body = '''
+							org.springframework.boot.SpringApplication.run(«monitoringSystemClassName».class, args);
+						'''
+					]
+				)
+
+			]
+		)
+
+		acceptor.accept(
+			monitoringSystemClass
 		)
 	}
 	

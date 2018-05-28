@@ -40,7 +40,7 @@ class ValourValidator extends AbstractValourValidator {
 
 		if (actualParameterCount !=
 			formalParameterCount) {
-			var msg = '''Bad parameter count for event Â«e.nameÂ»: Expected Â«formalParameterCountÂ» but found Â«actualParameterCountÂ»'''
+			var msg = '''Bad parameter count for event «e.name»: Expected «formalParameterCount» but found «actualParameterCount»'''
 			error(msg, ValourPackage.Literals.EVENT_REF__EVENT_REF_ID);
 		}
 
@@ -60,7 +60,7 @@ class ValourValidator extends AbstractValourValidator {
 				var errors = events.filter[e | e.name.equals(event.name)]
 				
 				if (!errors.isNullOrEmpty){
-					val msg = '''Duplicate event with name Â«event.nameÂ»'''
+					val msg = '''Duplicate event with name «event.name»'''
 					error(msg, ValourPackage.Literals.EVENT__NAME)
 					errors.forEach[e | error(msg, e, ValourPackage.Literals.EVENT__NAME)]
 				}
@@ -84,11 +84,11 @@ class ValourValidator extends AbstractValourValidator {
 				val eventCategorisation = event.eventRefId.eventBody.categorisation
 				
 				if ((eventCategorisation == null) || (eventCategorisation.category == null)){
-					val msg = '''Event Â«event.eventRefIdÂ» cannot be used within a for-each constructor without declaring which category it belongs to'''
+					val msg = '''Event «event.eventRefId» cannot be used within a for-each constructor without declaring which category it belongs to'''
 					error(msg, ValourPackage.Literals.FOR_EACH__VALOUR_BODY)		
 				}
 				else if (eventCategorisation.category.category != forEachCategory){
-					val msg = '''Event Â«event.eventRefId.nameÂ» declares a different type of category [Â«eventCategorisation.category.category.nameÂ»], while the current for-each constructor expects category of [Â«forEachCategory.nameÂ»]'''
+					val msg = '''Event «event.eventRefId.name» declares a different type of category [«eventCategorisation.category.category.name»], while the current for-each constructor expects category of [«forEachCategory.name»]'''
 					error(msg, r, ValourPackage.Literals.RULE__BASIC_RULE)
 				}
 			}
